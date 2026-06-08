@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <!-- Include the shared head fragment from layout.html -->
+    <th:block th:replace="~{fragments/layout :: head}"></th:block>
+</head>
+<body>
+
+<!-- Include the shared navbar -->
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="container-fluid">
+    <div class="row">
+
+        <!-- Include the shared sidebar -->
+        <div th:replace="~{fragments/layout :: sidebar}"></div>
+
+        <!-- Main content area -->
+        <main class="col-md-10 main-content">
+
+            <!-- Page Header Row -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-folder me-2 text-primary"></i>Projects</h2>
+                <a href="/projects/new" class="btn btn-primary">
+                    <i class="bi bi-folder-plus me-1"></i> New Project
+                </a>
+            </div>
+
+            <!--
+                Success message (flash attribute from redirect).
+                th:if="${successMessage}" — only renders if the variable exists.
+            -->
+            <div th:if="${successMessage}"
+                 class="alert alert-success alert-dismissible fade show" role="alert">
+                <!-- th:text sets the text content from the model variable -->
+                <i class="bi bi-check-circle me-2"></i>
+                <span th:text="${successMessage}">Success</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <!-- Projects Table Card -->
+            <div class="card">
+                <div class="card-header bg-white">
+                    <strong>All Projects</strong>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Project Name</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <!--
+                            th:each iterates over the 'projects' list from the model.
+                            'project' is the loop variable.
+                            'iterStat' gives us loop stats: index, count, first, last.
+                        -->
+                        <tr th:each="project, iterStat : ${projects}">
+                            <!-- iterStat.count starts at 1 -->
+                            <td th:text="${iterStat.count}">1</td>
+
+                            <td>
+                                <!--
+                                    th:href builds the URL dynamically.
+                                    @{/projects/{id}(id=${project.id})} generates
+                                    /projects/5 for a project with id=5.
+                                -->
+                                <a th:href="@{/projects/{id}(id=${project.id})}"
+                                   th:text="${project.name}"
+                                   class="text-decoration-none fw-bold">
+                                    Project Name
+                                </a>
+                            </td>
+
+                            <td>
+                                <!--
+                                    #strings.abbreviate truncates long strings.
+                                    Shows first 60 characters followed by "..."
+                                -->
+                                <span th:text="${#strings.abbreviate(project.description ?: 'No description', 60)}">
+                                            Description
+                                        </span>
+                            </td>
+
+                            <td>
+                                <!-- Edit button -->
+                                <a th:href="@{/projects/{id}/edit(id=${project.id})}"
+                                   class="btn btn-sm btn-outline-primary me-1">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+
+                                <!-- View button -->
+                                <a th:href="@{/projects/{id}(id=${project.id})}"
+                                   class="btn btn-sm btn-outline-info me-1">
+                                    <i class="bi bi-eye"></i> View
+                                </a>
+
+                                <!--
+                                    Delete form — using POST because HTML
+                                    forms cannot send DELETE requests natively.
+                                    th:action builds the URL dynamically.
+                                -->
+                                <form th:action="@{/projects/{id}/delete(id=${project.id})}"
+                                      method="post"
+                                      style="display: inline;"
+                                      onsubmit="return confirm('Delete this project? This cannot be undone.')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+
+                        <!--
+                            th:if="${#lists.isEmpty(projects)}" — shown when list is empty.
+                            This prevents a confusingly blank table.
+                        -->
+                        <tr th:if="${#lists.isEmpty(projects)}">
+                            <td colspan="4" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                                No projects yet.
+                                <a href="/projects/new">Create your first project</a>.
+                            </td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+</body>
+</html>

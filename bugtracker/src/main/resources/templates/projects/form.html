@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/layout :: head}"></th:block>
+</head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{fragments/layout :: sidebar}"></div>
+
+        <main class="col-md-10 main-content">
+
+            <div class="d-flex align-items-center mb-4">
+                <a href="/projects" class="btn btn-outline-secondary me-3">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+                <h2 th:text="${pageTitle}">Project Form</h2>
+            </div>
+
+            <div class="card" style="max-width: 600px;">
+                <div class="card-header bg-primary text-white">
+                    <strong th:text="${pageTitle}">Form</strong>
+                </div>
+                <div class="card-body">
+
+                    <!--
+                        th:action uses the formAction variable set in the controller.
+                        th:object="${projectDTO}" binds the form to the ProjectDTO.
+                        All th:field attributes inside will bind to projectDTO properties.
+                    -->
+                    <form th:action="${formAction}"
+                          th:object="${projectDTO}"
+                          method="post">
+
+                        <!-- Project Name Field -->
+                        <div class="mb-3">
+                            <label for="name" class="form-label fw-bold">
+                                Project Name <span class="text-danger">*</span>
+                            </label>
+                            <!--
+                                th:field="*{name}" binds this input to projectDTO.name.
+                                It automatically sets id="name", name="name",
+                                and pre-fills the value when editing.
+
+                                th:classappend adds the 'is-invalid' CSS class
+                                only when there are validation errors for this field.
+                            -->
+                            <input type="text"
+                                   class="form-control"
+                                   th:field="*{name}"
+                                   th:classappend="${#fields.hasErrors('name')} ? 'is-invalid'"
+                                   placeholder="Enter project name">
+
+                            <!--
+                                th:errors="*{name}" displays the validation error message
+                                for the 'name' field. Only renders if there is an error.
+                            -->
+                            <div class="invalid-feedback" th:errors="*{name}">
+                                Name error message here
+                            </div>
+                        </div>
+
+                        <!-- Description Field -->
+                        <div class="mb-3">
+                            <label for="description" class="form-label fw-bold">
+                                Description
+                            </label>
+                            <textarea class="form-control"
+                                      th:field="*{description}"
+                                      th:classappend="${#fields.hasErrors('description')} ? 'is-invalid'"
+                                      rows="4"
+                                      placeholder="Describe the project (optional)"></textarea>
+
+                            <div class="invalid-feedback" th:errors="*{description}">
+                                Description error message here
+                            </div>
+
+                            <!-- Character counter hint -->
+                            <div class="form-text">Maximum 500 characters.</div>
+                        </div>
+
+                        <!-- Form Buttons -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle me-1"></i> Save Project
+                            </button>
+                            <a href="/projects" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+</body>
+</html>
