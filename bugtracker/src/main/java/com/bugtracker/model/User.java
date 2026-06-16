@@ -2,86 +2,59 @@ package com.bugtracker.model;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * User Entity — maps to the 'users' table.
+ * User Entity — now implements Spring Security's UserDetails.
  *
- * Represents an application user. In Phase 4, this class will
- * implement Spring Security's UserDetails interface.
+ * UserDetails is the contract Spring Security uses to represent
+ * an authenticated user. By implementing it directly on our entity,
+ * we avoid creating a separate wrapper class.
  *
- * We use Set<Role> rather than List<Role> for the Many-to-Many
- * relationship because Set prevents duplicate roles and has no
- * ordering concern. Sets also perform better for contains() checks.
+ * Methods we must implement:
+ *   getAuthorities()     — returns the user's roles/permissions
+ *   getPassword()        — returns the stored (hashed) password
+ *   getUsername()        — returns the unique identifier (username)
+ *   isAccountNonExpired()    — can the account still be used?
+ *   isAccountNonLocked()     — is the account locked?
+ *   isCredentialsNonExpired()— is the password still valid?
+ *   isEnabled()              — is the account active?
  */
 @Entity
 @Table(name = "users")
-public class User {
+public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * unique = true generates a UNIQUE INDEX on this column in MySQL.
-     * This prevents two users from having the same username at the
-     * database level — not just the application level.
-     */
     @Column(unique = true, nullable = false, length = 50)
     private String username;
 
     @Column(unique = true, nullable = false, length = 100)
     private String email;
 
-    /**
-     * length = 255 because BCrypt hashes are 60 characters,
-     * but we use 255 for safety and future algorithm changes.
-     * NEVER store plain-text passwords.
-     */
     @Column(nullable = false, length = 255)
     private String password;
 
     @Column(name = "full_name", nullable = false, length = 100)
     private String fullName;
 
-    /**
-     * enabled = false means the user cannot log in.
-     * Useful for deactivating accounts without deleting them.
-     * columnDefinition sets the SQL type/default directly.
-     */
     @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
     private boolean enabled = true;
 
-    /**
-     * @CreationTimestamp tells Hibernate to automatically set this
-     * field to the current timestamp when the entity is first saved.
-     * updatable = false prevents it from being changed on updates.
-     */
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    /**
-     * Many-to-Many relationship with Role.
-     *
-     * @ManyToMany — a user can have multiple roles,
-     *               a role can belong to multiple users.
-     *
-     * @JoinTable specifies the join table details:
-     *   name = "user_roles"          — the join table name
-     *   joinColumns = user_id        — FK from this entity (User)
-     *   inverseJoinColumns = role_id — FK to the other entity (Role)
-     *
-     * FetchType.EAGER means roles are loaded immediately with the user.
-     * This is acceptable here because a user typically has 1-2 roles.
-     * For large collections, use LAZY loading (the default for collections).
-     *
-     * CascadeType: We do NOT cascade here because roles are
-     * shared across users — deleting a user should not delete ROLE_ADMIN.
-     */
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
@@ -90,48 +63,120 @@ public class User {
     )
     private Set<Role> roles = new HashSet<>();
 
-    // --- Constructors ---
+    // =========================================================
+    // UserDetails Interface Implementation
+    // =========================================================
+
+    /**
+     * Converts our Role objects into Spring Security's
+     * GrantedAuthority objects.
+     *
+     * Spring Security checks authorities (not Role entities)
+     * when deciding if a user can access a resource.
+     *
+     * Role.getName() returns "ROLE_ADMIN", "ROLE_DEVELOPER", etc.
+     * SimpleGrantedAuthority wraps the string into a GrantedAuthority.
+     */
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return roles.stream()
+                .map(role -> new SimpleGrantedAuthority(role.getName()))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Spring Security calls this to get the password for comparison.
+     * Returns the BCrypt hash stored in the database.
+     */
+    @Override
+    public String getPassword() {
+        return password;
+    }
+
+    /**
+     * Spring Security uses this as the unique identifier.
+     * Must match what the user types in the login form's
+     * username field.
+     */
+    @Override
+    public String getUsername() {
+        return username;
+    }
+
+    /**
+     * We return true for all three account state checks.
+     * In a production system you might implement account expiry
+     * or lockout after failed login attempts.
+     * For now, only 'enabled' matters.
+     */
+    @Override
+    public boolean isAccountNonExpired() { return true; }
+
+    @Override
+    public boolean isAccountNonLocked() { return true; }
+
+    @Override
+    public boolean isCredentialsNonExpired() { return true; }
+
+    /**
+     * Returns our 'enabled' field.
+     * If false, Spring Security rejects the login attempt
+     * with DisabledException.
+     */
+    @Override
+    public boolean isEnabled() { return enabled; }
+
+    // =========================================================
+    // Constructors
+    // =========================================================
 
     public User() {}
 
-    public User(String username, String email, String password, String fullName) {
+    public User(String username, String email,
+                String password, String fullName) {
         this.username = username;
-        this.email = email;
+        this.email    = email;
         this.password = password;
         this.fullName = fullName;
     }
 
-    // --- Helper Methods ---
+    // =========================================================
+    // Helper Methods
+    // =========================================================
+
+    public void addRole(Role role) { this.roles.add(role); }
+    public void removeRole(Role role) { this.roles.remove(role); }
 
     /**
-     * Helper to add a role. Keeps the Set management in the entity.
+     * Convenience method used in templates.
+     * Checks if this user has a specific role name.
+     * e.g. user.hasRole("ROLE_ADMIN")
      */
-    public void addRole(Role role) {
-        this.roles.add(role);
+    public boolean hasRole(String roleName) {
+        return roles.stream()
+                .anyMatch(role -> role.getName().equals(roleName));
     }
 
-    public void removeRole(Role role) {
-        this.roles.remove(role);
-    }
-
-    // --- Getters and Setters ---
+    // =========================================================
+    // Getters and Setters
+    // =========================================================
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public String getUsername() { return username; }
+    // Note: setUsername shadows UserDetails.getUsername()
+    // This is intentional — JPA needs setters, Spring Security needs getters
     public void setUsername(String username) { this.username = username; }
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
-    public String getPassword() { return password; }
+    // setPassword — Spring Security reads via getPassword() above
     public void setPassword(String password) { this.password = password; }
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
 
-    public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
@@ -142,6 +187,8 @@ public class User {
 
     @Override
     public String toString() {
-        return "User{id=" + id + ", username='" + username + "', email='" + email + "'}";
+        return "User{id=" + id +
+                ", username='" + username + "'" +
+                ", email='" + email + "'}";
     }
 }

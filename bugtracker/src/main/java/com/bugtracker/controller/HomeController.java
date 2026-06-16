@@ -1,51 +1,62 @@
 package com.bugtracker.controller;
 
+import com.bugtracker.model.User;
 import com.bugtracker.service.ProjectService;
+import com.bugtracker.service.UserService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 /**
- * Home Controller - handles requests to the root URL.
- * This is our first controller to verify the application works.
+ * HomeController — dashboard and root URL.
+ *
+ * @AuthenticationPrincipal injects the currently logged-in User object
+ * directly into controller methods. Spring Security stores the
+ * UserDetails object (our User entity) in the SecurityContextHolder,
+ * and this annotation retrieves it.
  */
 @Controller
 public class HomeController {
 
-    /**
-     * Handles GET requests to the root URL (/).
-     *
-     * @param model The Model object to pass data to the view
-     * @return The name of the Thymeleaf template to render
-     */
     private final ProjectService projectService;
-    public HomeController (ProjectService projectService){
+    private final UserService    userService;
+
+    public HomeController(ProjectService projectService,
+                          UserService userService) {
         this.projectService = projectService;
+        this.userService    = userService;
     }
+
     @GetMapping("/")
     public String home() {
-        // Redirect root URL to /dashboard
         return "redirect:/dashboard";
     }
 
     @GetMapping("/dashboard")
-    public String dashboard(Model model) {
-        // Fetch summary statistics for the dashboard
-        model.addAttribute("totalProjects", projectService.getProjectCount());
-        model.addAttribute("pageTitle", "Dashboard");
+    public String dashboard(
+            @AuthenticationPrincipal User currentUser,
+            Model model) {
 
-        // Placeholder values — will come from real services in Phase 3
-        model.addAttribute("totalBugs", 0);
-        model.addAttribute("openBugs", 0);
+        model.addAttribute("pageTitle", "Dashboard");
+        model.addAttribute("currentUser", currentUser);
+        model.addAttribute("totalProjects", projectService.getProjectCount());
+
+        // Placeholders — replaced in Phase 5 with real bug data
+        model.addAttribute("totalBugs",    0);
+        model.addAttribute("openBugs",     0);
         model.addAttribute("resolvedBugs", 0);
 
         return "dashboard";
     }
-
-    /**
-     * Health check endpoint for monitoring.
-     * Returns a simple text response.
-     */
+    @GetMapping("/generate-hash")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public String generateHash() {
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(10);
+        String hash = encoder.encode("admin123");
+        return "Hash: " + hash;
+    }
     @GetMapping("/health")
     @org.springframework.web.bind.annotation.ResponseBody
     public String health() {
