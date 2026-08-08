@@ -4,7 +4,9 @@ import com.bugtracker.dto.ProjectDTO;
 import com.bugtracker.exception.ResourceNotFoundException;
 import com.bugtracker.model.Project;
 import com.bugtracker.model.ProjectStatus;
+import com.bugtracker.model.User;
 import com.bugtracker.repository.ProjectRepository;
+import com.bugtracker.util.SecurityUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,7 +69,10 @@ public class ProjectService {
         project.setName(dto.getName().trim());
         project.setDescription(dto.getDescription());
         project.setStatus(ProjectStatus.ACTIVE);
-        // In Phase 4, we set createdBy to the logged-in user
+
+        // Set the creator to the currently logged-in user
+        User currentUser = SecurityUtils.getCurrentUser();
+        project.setCreatedBy(currentUser);
 
         Project saved = projectRepository.save(project);
         return convertToDTO(saved);

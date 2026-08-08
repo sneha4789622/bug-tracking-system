@@ -131,6 +131,8 @@ public class SecurityConfig {
                                 "/css/**",
                                 "/js/**",
                                 "/images/**",
+                                "/favicon.ico",      // ← add this
+                                "/favicon.svg",      // ← and this
                                 "/webjars/**",
                                 "/health"
                         ).permitAll()

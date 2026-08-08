@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <th:block th:replace="~{fragments/layout :: head}"></th:block>
+</head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{fragments/layout :: sidebar}"></div>
+
+        <main class="col-md-10 main-content">
+
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-bug me-2 text-danger"></i>Bugs</h2>
+                <a href="/bugs/new" class="btn btn-danger">
+                    <i class="bi bi-plus-circle me-1"></i>Report Bug
+                </a>
+            </div>
+
+            <!-- Success / Error Flash Messages -->
+            <div th:if="${successMessage}"
+                 class="alert alert-success alert-dismissible fade show">
+                <i class="bi bi-check-circle me-2"></i>
+                <span th:text="${successMessage}"></span>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="alert"></button>
+            </div>
+
+            <!-- Filter Panel -->
+            <div class="card mb-4">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-funnel me-2"></i>Filter Bugs
+                </div>
+                <div class="card-body">
+                    <!--
+                        method="get" — filters go into the URL as query params.
+                        This lets users bookmark filtered views and use
+                        the browser back button correctly.
+                    -->
+                    <form method="get" action="/bugs" th:object="${filter}">
+                        <div class="row g-3">
+
+                            <!-- Status Filter -->
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold">Status</label>
+                                <select class="form-select form-select-sm"
+                                        th:field="*{status}">
+                                    <option value="">All Statuses</option>
+                                    <option th:each="s : ${allStatuses}"
+                                            th:value="${s}"
+                                            th:text="${s.displayName}">
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Priority Filter -->
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold">Priority</label>
+                                <select class="form-select form-select-sm"
+                                        th:field="*{priority}">
+                                    <option value="">All Priorities</option>
+                                    <option th:each="p : ${allPriorities}"
+                                            th:value="${p}"
+                                            th:text="${p.displayName}">
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Severity Filter -->
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold">Severity</label>
+                                <select class="form-select form-select-sm"
+                                        th:field="*{severity}">
+                                    <option value="">All Severities</option>
+                                    <option th:each="s : ${allSeverities}"
+                                            th:value="${s}"
+                                            th:text="${s.displayName}">
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Project Filter -->
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold">Project</label>
+                                <select class="form-select form-select-sm"
+                                        th:field="*{projectId}">
+                                    <option value="">All Projects</option>
+                                    <option th:each="p : ${allProjects}"
+                                            th:value="${p.id}"
+                                            th:text="${p.name}">
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Keyword Search -->
+                            <div class="col-md-3">
+                                <label class="form-label small fw-semibold">Search</label>
+                                <input type="text"
+                                       class="form-control form-control-sm"
+                                       th:field="*{keyword}"
+                                       placeholder="Title or description...">
+                            </div>
+
+                            <!-- Buttons -->
+                            <div class="col-md-1 d-flex align-items-end gap-1">
+                                <button type="submit"
+                                        class="btn btn-primary btn-sm">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                                <a href="/bugs"
+                                   class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-x"></i>
+                                </a>
+                            </div>
+
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Results count -->
+            <div class="text-muted small mb-2">
+                Showing
+                <strong th:text="${bugs.size()}">0</strong> bugs
+                <span th:if="${filter.hasActiveFilters()}"
+                      class="text-primary">(filtered)</span>
+            </div>
+
+            <!-- Bug Table -->
+            <div class="card">
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                        <tr>
+                            <th style="width:60px">#</th>
+                            <th>Title</th>
+                            <th>Project</th>
+                            <th>Severity</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Assignee</th>
+                            <th>Comments</th>
+                            <th>Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="bug : ${bugs}">
+
+                            <td class="text-muted small"
+                                th:text="'#' + ${bug.id}">
+                            </td>
+
+                            <td>
+                                <a th:href="@{/bugs/{id}(id=${bug.id})}"
+                                   th:text="${bug.title}"
+                                   class="text-decoration-none fw-semibold">
+                                </a>
+                            </td>
+
+                            <td>
+                                    <span class="badge bg-secondary"
+                                          th:text="${bug.projectName}">
+                                    </span>
+                            </td>
+
+                            <!--
+                                th:classappend builds the badge CSS class dynamically.
+                                We use a string concatenation to pick the right
+                                colour class defined in layout.html styles.
+                                e.g. status=CRITICAL → 'badge badge-severity-critical'
+                            -->
+                            <td>
+                                    <span class="badge"
+                                          th:classappend="'badge-severity-' + ${#strings.toLowerCase(bug.severity)}"
+                                          th:text="${bug.severity.displayName}">
+                                    </span>
+                            </td>
+
+                            <td>
+                                    <span class="badge"
+                                          th:classappend="'badge-severity-' + ${#strings.toLowerCase(bug.priority)}"
+                                          th:text="${bug.priority.displayName}">
+                                    </span>
+                            </td>
+
+                            <td>
+                                    <span class="badge"
+                                          th:classappend="'badge-status-' + ${#strings.toLowerCase(#strings.replace(bug.status, '_', '_'))}"
+                                          th:text="${bug.status.displayName}">
+                                    </span>
+                            </td>
+
+                            <td>
+                                    <span th:if="${bug.assigneeName != null}"
+                                          th:text="${bug.assigneeName}"
+                                          class="small">
+                                    </span>
+                                <span th:if="${bug.assigneeName == null}"
+                                      class="text-muted small">
+                                        Unassigned
+                                    </span>
+                            </td>
+
+                            <td class="text-center">
+                                    <span class="badge bg-light text-dark"
+                                          th:text="${bug.commentCount}">0</span>
+                            </td>
+
+                            <td>
+                                <a th:href="@{/bugs/{id}(id=${bug.id})}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a th:href="@{/bugs/{id}/edit(id=${bug.id})}"
+                                   class="btn btn-sm btn-outline-secondary ms-1">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </td>
+
+                        </tr>
+
+                        <!-- Empty state -->
+                        <tr th:if="${#lists.isEmpty(bugs)}">
+                            <td colspan="9"
+                                class="text-center text-muted py-5">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                No bugs found.
+                                <span th:if="${filter.hasActiveFilters()}">
+                                        Try clearing the filters.
+                                    </span>
+                                <span th:if="${!filter.hasActiveFilters()}">
+                                        <a href="/bugs/new">Report the first bug</a>.
+                                    </span>
+                            </td>
+                        </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+</body>
+</html>

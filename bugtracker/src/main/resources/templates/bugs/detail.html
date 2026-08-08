@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <th:block th:replace="~{fragments/layout :: head}"></th:block>
+    <style>
+        .timeline-item {
+            border-left: 3px solid #dee2e6;
+            padding-left: 15px;
+            margin-bottom: 8px;
+            position: relative;
+        }
+        .timeline-item::before {
+            content: '';
+            width: 10px;
+            height: 10px;
+            background: #6c757d;
+            border-radius: 50%;
+            position: absolute;
+            left: -7px;
+            top: 5px;
+        }
+        .comment-card {
+            border-left: 4px solid #0d6efd;
+            background: #f8f9ff;
+        }
+        .comment-card.own-comment {
+            border-left-color: #198754;
+            background: #f0fff4;
+        }
+    </style>
+</head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{fragments/layout :: sidebar}"></div>
+
+        <main class="col-md-10 main-content">
+
+            <!-- Back + Actions -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="/bugs" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                    <h4 class="mb-0">
+                        <span class="text-muted">#<span th:text="${bug.id}"></span></span>
+                        <span th:text="${bug.title}" class="ms-2"></span>
+                    </h4>
+                </div>
+
+                <!-- Admin / PM actions -->
+                <div sec:authorize="hasAnyRole('ADMIN','PROJECT_MANAGER')"
+                     class="d-flex gap-2">
+                    <a th:href="@{/bugs/{id}/edit(id=${bug.id})}"
+                       class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-pencil me-1"></i>Edit
+                    </a>
+                    <form th:action="@{/bugs/{id}/delete(id=${bug.id})}"
+                          method="post" style="display:inline"
+                          onsubmit="return confirm('Permanently delete this bug?')">
+                        <button class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash me-1"></i>Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Flash Messages -->
+            <div th:if="${successMessage}"
+                 class="alert alert-success alert-dismissible fade show">
+                <i class="bi bi-check-circle me-2"></i>
+                <span th:text="${successMessage}"></span>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="alert"></button>
+            </div>
+            <div th:if="${errorMessage}"
+                 class="alert alert-danger alert-dismissible fade show">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <span th:text="${errorMessage}"></span>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="alert"></button>
+            </div>
+
+            <div class="row g-4">
+
+                <!-- ═══ LEFT COLUMN: Bug Details ═══════════════════ -->
+                <div class="col-md-8">
+
+                    <!-- Description -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-white fw-bold">
+                            <i class="bi bi-file-text me-2"></i>Description
+                        </div>
+                        <div class="card-body">
+                            <!--
+                                th:utext renders HTML content.
+                                th:text renders plain text (safer — prevents XSS).
+                                Use th:text for user-provided content UNLESS
+                                you have sanitized it. We use th:text here.
+                            -->
+                            <p th:text="${bug.description}"
+                               style="white-space: pre-wrap;"
+                               class="mb-0">
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- ─── Comments Section ─── -->
+                    <div class="card mb-4" id="comments">
+                        <div class="card-header bg-white fw-bold">
+                            <i class="bi bi-chat-dots me-2"></i>
+                            Comments
+                            <span class="badge bg-secondary ms-1"
+                                  th:text="${bug.commentCount}">0</span>
+                        </div>
+                        <div class="card-body">
+
+                            <!-- Comment thread -->
+                            <div th:if="${#lists.isEmpty(comments)}"
+                                 class="text-muted text-center py-3">
+                                No comments yet. Be the first to comment.
+                            </div>
+
+                            <div th:each="comment : ${comments}" class="mb-3">
+                                <!--
+                                    Add 'own-comment' class if the current user
+                                    wrote this comment — gives it a green border.
+                                -->
+                                <div class="comment-card card p-3"
+                                     th:classappend="${comment.authorId == currentUser.id}
+                                                     ? 'own-comment'">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <strong th:text="${comment.authorName}">
+                                                Author
+                                            </strong>
+                                            <span class="text-muted small ms-2"
+                                                  th:text="${#temporals.format(comment.createdAt, 'MMM d, yyyy HH:mm')}">
+                                                Date
+                                            </span>
+                                        </div>
+
+                                        <!-- Delete comment (own comment or admin) -->
+                                        <form th:if="${comment.authorId == currentUser.id
+                                                    or #authorization.expression('hasRole(''ADMIN'')')}"
+                                              th:action="@{/bugs/{bugId}/comments/{commentId}/delete(bugId=${bug.id},commentId=${comment.id})}"
+                                              method="post">
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-link text-danger p-0"
+                                                    onclick="return confirm('Delete this comment?')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <p class="mb-0 mt-2"
+                                       th:text="${comment.content}"
+                                       style="white-space: pre-wrap;">
+                                    </p>
+                                </div>
+                            </div>
+
+                            <hr>
+
+                            <!-- Add Comment Form -->
+                            <div>
+                                <h6 class="fw-bold mb-3">Add a Comment</h6>
+                                <div th:if="${commentError}"
+                                     class="alert alert-danger small">
+                                    <span th:text="${commentError}"></span>
+                                </div>
+
+                                <form th:action="@{/bugs/{id}/comments(id=${bug.id})}"
+                                      th:object="${commentDTO}"
+                                      method="post">
+                                    <div class="mb-2">
+                                        <textarea class="form-control"
+                                                  th:field="*{content}"
+                                                  rows="3"
+                                                  placeholder="Add your comment here...">
+                                        </textarea>
+                                    </div>
+                                    <button type="submit"
+                                            class="btn btn-primary btn-sm">
+                                        <i class="bi bi-send me-1"></i>Post Comment
+                                    </button>
+                                </form>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ═══ RIGHT COLUMN: Metadata & Actions ═══════════ -->
+                <div class="col-md-4">
+
+                    <!-- Status + Metadata Card -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-white fw-bold">
+                            <i class="bi bi-info-circle me-2"></i>Details
+                        </div>
+                        <div class="card-body">
+                            <dl class="row mb-0">
+
+                                <dt class="col-5 text-muted small">Status</dt>
+                                <dd class="col-7">
+                                    <span class="badge"
+                                          th:classappend="'badge-status-' + ${#strings.toLowerCase(bug.status)}"
+                                          th:text="${bug.status.displayName}">
+                                    </span>
+                                </dd>
+
+                                <dt class="col-5 text-muted small">Severity</dt>
+                                <dd class="col-7">
+                                    <span class="badge"
+                                          th:classappend="'badge-severity-' + ${#strings.toLowerCase(bug.severity)}"
+                                          th:text="${bug.severity.displayName}">
+                                    </span>
+                                </dd>
+
+                                <dt class="col-5 text-muted small">Priority</dt>
+                                <dd class="col-7">
+                                    <span class="badge"
+                                          th:classappend="'badge-severity-' + ${#strings.toLowerCase(bug.priority)}"
+                                          th:text="${bug.priority.displayName}">
+                                    </span>
+                                </dd>
+
+                                <dt class="col-5 text-muted small">Project</dt>
+                                <dd class="col-7 small"
+                                    th:text="${bug.projectName}"></dd>
+
+                                <dt class="col-5 text-muted small">Reporter</dt>
+                                <dd class="col-7 small"
+                                    th:text="${bug.reporterName ?: 'Unknown'}">
+                                </dd>
+
+                                <dt class="col-5 text-muted small">Assignee</dt>
+                                <dd class="col-7 small"
+                                    th:text="${bug.assigneeName ?: 'Unassigned'}">
+                                </dd>
+
+                                <dt class="col-5 text-muted small">Created</dt>
+                                <dd class="col-7 small"
+                                    th:text="${#temporals.format(bug.createdAt, 'MMM d, yyyy')}">
+                                </dd>
+
+                                <dt class="col-5 text-muted small">Updated</dt>
+                                <dd class="col-7 small mb-0"
+                                    th:text="${#temporals.format(bug.updatedAt, 'MMM d, yyyy')}">
+                                </dd>
+
+                            </dl>
+                        </div>
+                    </div>
+
+                    <!-- Update Status Card -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-white fw-bold">
+                            <i class="bi bi-arrow-repeat me-2"></i>Update Status
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{/bugs/{id}/status(id=${bug.id})}"
+                                  method="post">
+                                <select name="newStatus"
+                                        class="form-select form-select-sm mb-2">
+                                    <option th:each="s : ${allStatuses}"
+                                            th:value="${s}"
+                                            th:text="${s.displayName}"
+                                            th:selected="${s == bug.status}">
+                                    </option>
+                                </select>
+                                <button type="submit"
+                                        class="btn btn-primary btn-sm w-100">
+                                    Update Status
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Assign Bug Card (Admin / PM only) -->
+                    <div class="card mb-3"
+                         sec:authorize="hasAnyRole('ADMIN','PROJECT_MANAGER')">
+                        <div class="card-header bg-white fw-bold">
+                            <i class="bi bi-person-check me-2"></i>Assign Bug
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{/bugs/{id}/assign(id=${bug.id})}"
+                                  method="post">
+                                <select name="assigneeId"
+                                        class="form-select form-select-sm mb-2">
+                                    <option value="">-- Unassigned --</option>
+                                    <option th:each="dev : ${allDevelopers}"
+                                            th:value="${dev.id}"
+                                            th:text="${dev.fullName}"
+                                            th:selected="${dev.id == bug.assigneeId}">
+                                    </option>
+                                </select>
+                                <button type="submit"
+                                        class="btn btn-outline-primary btn-sm w-100">
+                                    Save Assignment
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+</body>
+</html>
