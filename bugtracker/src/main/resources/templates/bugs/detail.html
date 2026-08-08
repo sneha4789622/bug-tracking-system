@@ -90,6 +90,7 @@
                 <!-- ═══ LEFT COLUMN: Bug Details ═══════════════════ -->
                 <div class="col-md-8">
 
+
                     <!-- Description -->
                     <div class="card mb-4">
                         <div class="card-header bg-white fw-bold">
@@ -189,6 +190,81 @@
                                         <i class="bi bi-send me-1"></i>Post Comment
                                     </button>
                                 </form>
+                            </div>
+
+                        </div>
+                    </div>
+                    <!-- ─── History / Audit Trail ─── -->
+                    <div class="card">
+                        <div class="card-header bg-white fw-bold">
+                            <i class="bi bi-clock-history me-2"></i>Activity History
+                        </div>
+                        <div class="card-body">
+
+                            <div th:if="${#lists.isEmpty(history)}"
+                                 class="text-muted text-center py-3">
+                                No history recorded yet.
+                            </div>
+
+                            <!--
+                                th:each iterates the history list.
+                                Each BugHistory entry has: fieldChanged, oldValue,
+                                newValue, changedBy (User), changedAt (LocalDateTime).
+                            -->
+                            <div th:each="entry : ${history}"
+                                 class="timeline-item">
+
+                                <div class="d-flex justify-content-between
+                        align-items-start">
+                                    <div>
+                                        <!-- Changed field label -->
+                                        <span class="badge bg-light text-dark me-1"
+                                              th:text="${#strings.capitalize(
+                                     entry.fieldChanged)}">
+                    </span>
+
+                                        <!--
+                                            Show old → new value.
+                                            th:if="${entry.oldValue != null}" hides the
+                                            arrow for creation events where there's no
+                                            old value.
+                                        -->
+                                        <span th:if="${entry.oldValue != null}"
+                                              class="text-muted small">
+                        <span th:text="${entry.oldValue}"
+                              class="text-danger">
+                        </span>
+                        <i class="bi bi-arrow-right mx-1"></i>
+                        <span th:text="${entry.newValue}"
+                              class="text-success">
+                        </span>
+                    </span>
+
+                                        <!-- Creation event (no old value) -->
+                                        <span th:if="${entry.oldValue == null}"
+                                              class="small text-success">
+                        Set to
+                        <strong th:text="${entry.newValue}"></strong>
+                    </span>
+                                    </div>
+
+                                    <div class="text-end text-muted small">
+                                        <!-- Who made the change -->
+                                        <span th:if="${entry.changedBy != null}"
+                                              th:text="${entry.changedBy.fullName}">
+                    </span>
+                                        <span th:if="${entry.changedBy == null}">
+                        System
+                    </span>
+                                        <br>
+                                        <!-- When the change was made -->
+                                        <span th:text="${#temporals.format(
+                                     entry.changedAt,
+                                     'MMM d, yyyy HH:mm')}">
+                    </span>
+                                    </div>
+                                </div>
+
                             </div>
 
                         </div>

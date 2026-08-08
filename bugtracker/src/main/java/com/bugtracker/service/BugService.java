@@ -8,6 +8,7 @@ import com.bugtracker.repository.*;
 import com.bugtracker.util.SecurityUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.bugtracker.model.BugHistory;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -146,7 +147,15 @@ public class BugService {
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
-
+    /**
+     * Returns the full history for a bug, most recent first.
+     * Used to display the audit trail on the bug detail page.
+     */
+    @Transactional(readOnly = true)
+    public List<BugHistory> getBugHistory(Long bugId) {
+        Bug bug = findBugOrThrow(bugId);
+        return bugHistoryRepository.findByBugOrderByChangedAtDesc(bug);
+    }
     // =========================================================
     // CREATE
     // =========================================================

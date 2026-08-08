@@ -207,7 +207,15 @@ public class SecurityConfig {
                         // Where to redirect when session is expired by a
                         // concurrent login
                         .expiredUrl("/auth/login?expired=true")
-                );
+                )
+                // ─── Exception Handling ───────────────────────────────
+                .exceptionHandling(ex -> ex
+
+                // Custom 403 page — shown when an authenticated user
+                // tries to access a URL their role does not permit.
+                // Without this, Spring shows a plain white error page.
+                .accessDeniedPage("/error/403")
+        );
 
         return http.build();
     }

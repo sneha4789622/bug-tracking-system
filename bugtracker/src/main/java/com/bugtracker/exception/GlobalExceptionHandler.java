@@ -50,18 +50,12 @@ public class GlobalExceptionHandler {
      * @param model     the Model for the error view
      * @return the error template
      */
-    @ExceptionHandler(Exception.class)
-    public String handleGeneralException(Exception exception,
-                                         Model model) {
-        model.addAttribute("errorTitle", "Something Went Wrong");
-        model.addAttribute("errorMessage",
-                "An unexpected error occurred. Please try again.");
-        model.addAttribute("errorCode", "500");
-
-        // Log the actual exception for debugging (we'll add proper logging later)
-        System.err.println("Unhandled exception: " + exception.getMessage());
-        exception.printStackTrace();
-
+    @ExceptionHandler(SecurityException.class)
+    public String handleSecurityException(SecurityException exception,
+                                          Model model) {
+        model.addAttribute("errorTitle",   "Access Denied");
+        model.addAttribute("errorMessage", exception.getMessage());
+        model.addAttribute("errorCode",    "403");
         return "error/error";
     }
 }

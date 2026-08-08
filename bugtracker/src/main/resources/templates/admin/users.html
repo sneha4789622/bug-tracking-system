@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <th:block th:replace="~{fragments/layout :: head}"></th:block>
+</head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="container-fluid">
+    <div class="row">
+        <div th:replace="~{fragments/layout :: sidebar}"></div>
+
+        <main class="col-md-10 main-content">
+
+            <!-- Header -->
+            <div class="d-flex justify-content-between
+                        align-items-center mb-4">
+                <div>
+                    <h2>
+                        <i class="bi bi-people me-2 text-primary"></i>
+                        User Management
+                    </h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/dashboard">Dashboard</a>
+                            </li>
+                            <li class="breadcrumb-item active">
+                                User Management
+                            </li>
+                        </ol>
+                    </nav>
+                </div>
+                <span class="badge bg-primary fs-6"
+                      th:text="${users.size()} + ' Users'">
+                </span>
+            </div>
+
+            <!-- Flash Messages -->
+            <div th:if="${successMessage}"
+                 class="alert alert-success alert-dismissible fade show">
+                <i class="bi bi-check-circle me-2"></i>
+                <span th:text="${successMessage}"></span>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="alert"></button>
+            </div>
+
+            <div th:if="${errorMessage}"
+                 class="alert alert-danger alert-dismissible fade show">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <span th:text="${errorMessage}"></span>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="alert"></button>
+            </div>
+
+            <!-- Users Table -->
+            <div class="card">
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead>
+                        <tr>
+                            <th style="width:50px">#</th>
+                            <th>Name</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Joined</th>
+                            <th style="width:220px">Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="user, stat : ${users}">
+
+                            <td class="text-muted small"
+                                th:text="${stat.count}"></td>
+
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <!--
+                                        Initials avatar — shows first letter
+                                        of the user's full name.
+                                        #strings.substring gets a substring.
+                                    -->
+                                    <div class="rounded-circle bg-primary
+                                                    d-flex align-items-center
+                                                    justify-content-center text-white"
+                                         style="width:36px;height:36px;
+                                                    font-size:0.85rem;
+                                                    flex-shrink:0">
+                                            <span th:text="${#strings.toUpperCase(
+                                                              #strings.substring(
+                                                              user.fullName,0,1))}">
+                                            </span>
+                                    </div>
+                                    <span class="fw-semibold"
+                                          th:text="${user.fullName}">
+                                        </span>
+                                </div>
+                            </td>
+
+                            <td class="text-muted"
+                                th:text="'@' + ${user.username}">
+                            </td>
+
+                            <td class="small"
+                                th:text="${user.email}">
+                            </td>
+
+                            <!-- Current Role Badge -->
+                            <td>
+                                    <span th:each="role : ${user.roles}"
+                                          class="badge"
+                                          th:classappend="${role.name == 'ROLE_ADMIN'}
+                                                         ? 'bg-danger'
+                                                         : (${role.name == 'ROLE_PROJECT_MANAGER'}
+                                                           ? 'bg-warning text-dark'
+                                                           : 'bg-info text-dark')"
+                                          th:text="${#strings.replace(
+                                                     #strings.replace(
+                                                     role.name,'ROLE_','')
+                                                     ,'_',' ')}">
+                                    </span>
+                            </td>
+
+                            <!-- Enabled / Disabled Badge -->
+                            <td>
+                                    <span th:if="${user.enabled}"
+                                          class="badge bg-success">
+                                        <i class="bi bi-check-circle me-1"></i>Active
+                                    </span>
+                                <span th:if="${!user.enabled}"
+                                      class="badge bg-secondary">
+                                        <i class="bi bi-x-circle me-1"></i>Disabled
+                                    </span>
+                            </td>
+
+                            <td class="small text-muted"
+                                th:text="${user.createdAt != null}
+                                             ? ${#temporals.format(
+                                               user.createdAt,'MMM d, yyyy')}
+                                             : '-'">
+                            </td>
+
+                            <!-- Actions Column -->
+                            <td>
+                                <div class="d-flex gap-1 flex-wrap">
+
+                                    <!-- Change Role Form -->
+                                    <form th:action="@{/admin/users/{id}/role(id=${user.id})}"
+                                          method="post"
+                                          class="d-flex gap-1">
+                                        <select name="roleName"
+                                                class="form-select form-select-sm"
+                                                style="width:auto">
+                                            <option th:each="role : ${availableRoles}"
+                                                    th:value="${role}"
+                                                    th:text="${#strings.replace(
+                                                                   #strings.replace(
+                                                                   role,'ROLE_',''),
+                                                                   '_',' ')}"
+                                                    th:selected="${user.roles.stream()
+                                                                      .anyMatch(r -> r.name == role)}">
+                                            </option>
+                                        </select>
+                                        <button type="submit"
+                                                class="btn btn-sm btn-outline-primary"
+                                                title="Change Role">
+                                            <i class="bi bi-person-badge"></i>
+                                        </button>
+                                    </form>
+
+                                    <!-- Toggle Enabled / Disabled -->
+                                    <!--
+                                        We pass the OPPOSITE of current state
+                                        so the button toggles the status.
+                                        th:value="${!user.enabled}" sends true
+                                        if the user is currently disabled
+                                        (to enable them) and vice versa.
+                                    -->
+                                    <form th:action="@{/admin/users/{id}/toggle(id=${user.id})}"
+                                          method="post">
+                                        <input type="hidden"
+                                               name="enabled"
+                                               th:value="${!user.enabled}">
+                                        <button type="submit"
+                                                class="btn btn-sm"
+                                                th:classappend="${user.enabled}
+                                                                    ? 'btn-outline-warning'
+                                                                    : 'btn-outline-success'"
+                                                th:title="${user.enabled}
+                                                               ? 'Deactivate account'
+                                                               : 'Activate account'">
+                                            <i class="bi"
+                                               th:classappend="${user.enabled}
+                                                                   ? 'bi-person-dash'
+                                                                   : 'bi-person-check'">
+                                            </i>
+                                        </button>
+                                    </form>
+
+                                </div>
+                            </td>
+
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/layout :: scripts}"></th:block>
+</body>
+</html>

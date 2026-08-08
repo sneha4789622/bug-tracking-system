@@ -160,14 +160,15 @@ public class BugController {
         BugDTO bug = bugService.getBugById(id);
 
         model.addAttribute("bug",         bug);
-        model.addAttribute("pageTitle",   "Bug #" + id + ": " + bug.getTitle());
+        model.addAttribute("pageTitle",   "Bug #" + id);
         model.addAttribute("comments",    commentService.getCommentsForBug(id));
         model.addAttribute("commentDTO",  new CommentDTO());
         model.addAttribute("currentUser", currentUser);
-
-        // Used to show/hide action buttons based on role
         model.addAttribute("allStatuses",  BugStatus.values());
         model.addAttribute("allDevelopers",userService.getAllDevelopers());
+
+        // Add history for the audit trail panel
+        model.addAttribute("history",     bugService.getBugHistory(id));
 
         return "bugs/detail";
     }
