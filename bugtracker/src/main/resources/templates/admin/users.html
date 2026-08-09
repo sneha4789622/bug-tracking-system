@@ -46,7 +46,6 @@
                 <button type="button" class="btn-close"
                         data-bs-dismiss="alert"></button>
             </div>
-
             <div th:if="${errorMessage}"
                  class="alert alert-danger alert-dismissible fade show">
                 <i class="bi bi-exclamation-triangle me-2"></i>
@@ -68,31 +67,36 @@
                             <th>Role</th>
                             <th>Status</th>
                             <th>Joined</th>
-                            <th style="width:220px">Actions</th>
+                            <th>Actions</th>
                         </tr>
                         </thead>
                         <tbody>
+
                         <tr th:each="user, stat : ${users}">
 
+                            <!-- # -->
                             <td class="text-muted small"
-                                th:text="${stat.count}"></td>
+                                th:text="${stat.count}">
+                            </td>
 
+                            <!-- Name with Avatar -->
                             <td>
                                 <div class="d-flex align-items-center gap-2">
-                                    <!--
-                                        Initials avatar — shows first letter
-                                        of the user's full name.
-                                        #strings.substring gets a substring.
-                                    -->
                                     <div class="rounded-circle bg-primary
                                                     d-flex align-items-center
-                                                    justify-content-center text-white"
+                                                    justify-content-center
+                                                    text-white fw-bold"
                                          style="width:36px;height:36px;
                                                     font-size:0.85rem;
-                                                    flex-shrink:0">
-                                            <span th:text="${#strings.toUpperCase(
-                                                              #strings.substring(
-                                                              user.fullName,0,1))}">
+                                                    flex-shrink:0;">
+                                        <!--
+                                            #strings.substring(text, start, end)
+                                            Gets first character of full name
+                                            for the avatar circle.
+                                        -->
+                                        <span th:text="${#strings.toUpperCase(
+                                                #strings.substring(
+                                                user.fullName, 0, 1))}">
                                             </span>
                                     </div>
                                     <span class="fw-semibold"
@@ -101,110 +105,172 @@
                                 </div>
                             </td>
 
+                            <!-- Username -->
                             <td class="text-muted"
                                 th:text="'@' + ${user.username}">
                             </td>
 
+                            <!-- Email -->
                             <td class="small"
                                 th:text="${user.email}">
                             </td>
 
-                            <!-- Current Role Badge -->
+                            <!-- Role Badge -->
+                            <!--
+                                FIX: Do NOT use stream().anyMatch() in Thymeleaf.
+                                Instead iterate roles with th:each and show a badge
+                                for each role the user has.
+                                This is what was breaking the loop for all other users.
+                            -->
                             <td>
-                                    <span th:each="role : ${user.roles}"
-                                          class="badge"
-                                          th:classappend="${role.name == 'ROLE_ADMIN'}
-                                                         ? 'bg-danger'
-                                                         : (${role.name == 'ROLE_PROJECT_MANAGER'}
-                                                           ? 'bg-warning text-dark'
-                                                           : 'bg-info text-dark')"
-                                          th:text="${#strings.replace(
-                                                     #strings.replace(
-                                                     role.name,'ROLE_','')
-                                                     ,'_',' ')}">
+                                    <span th:each="role : ${user.roles}">
+                                        <span class="badge"
+                                              th:text="${#strings.replace(
+                                                         #strings.replace(
+                                                         role.name,
+                                                         'ROLE_', ''),
+                                                         '_', ' ')}"
+                                              th:classappend="${role.name == 'ROLE_ADMIN'}
+                                                  ? 'bg-danger'
+                                                  : (${role.name == 'ROLE_PROJECT_MANAGER'}
+                                                     ? 'bg-warning text-dark'
+                                                     : 'bg-info text-dark')">
+                                        </span>
                                     </span>
                             </td>
 
-                            <!-- Enabled / Disabled Badge -->
+                            <!-- Status Badge -->
                             <td>
                                     <span th:if="${user.enabled}"
                                           class="badge bg-success">
-                                        <i class="bi bi-check-circle me-1"></i>Active
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        Active
                                     </span>
                                 <span th:if="${!user.enabled}"
                                       class="badge bg-secondary">
-                                        <i class="bi bi-x-circle me-1"></i>Disabled
+                                        <i class="bi bi-x-circle me-1"></i>
+                                        Disabled
                                     </span>
                             </td>
 
-                            <td class="small text-muted"
-                                th:text="${user.createdAt != null}
-                                             ? ${#temporals.format(
-                                               user.createdAt,'MMM d, yyyy')}
-                                             : '-'">
+                            <!-- Joined Date -->
+                            <td class="small text-muted">
+                                    <span th:if="${user.createdAt != null}"
+                                          th:text="${#temporals.format(
+                                                     user.createdAt,
+                                                     'MMM d, yyyy')}">
+                                    </span>
+                                <span th:if="${user.createdAt == null}">
+                                        —
+                                    </span>
                             </td>
 
-                            <!-- Actions Column -->
+                            <!-- Actions -->
                             <td>
-                                <div class="d-flex gap-1 flex-wrap">
+                                <div class="d-flex gap-2 align-items-center">
 
-                                    <!-- Change Role Form -->
+                                    <!--
+                                        CHANGE ROLE FORM.
+                                        Each user row has its own form.
+                                        The select and button are both
+                                        INSIDE the same form tag.
+                                    -->
                                     <form th:action="@{/admin/users/{id}/role(id=${user.id})}"
                                           method="post"
-                                          class="d-flex gap-1">
+                                          class="d-flex gap-1
+                                                     align-items-center">
+
                                         <select name="roleName"
-                                                class="form-select form-select-sm"
-                                                style="width:auto">
-                                            <option th:each="role : ${availableRoles}"
-                                                    th:value="${role}"
-                                                    th:text="${#strings.replace(
-                                                                   #strings.replace(
-                                                                   role,'ROLE_',''),
-                                                                   '_',' ')}"
-                                                    th:selected="${user.roles.stream()
-                                                                      .anyMatch(r -> r.name == role)}">
+                                                class="form-select
+                                                           form-select-sm"
+                                                style="width: 160px;">
+
+                                            <option value="ROLE_ADMIN"
+                                                    th:selected="${user.hasRole('ROLE_ADMIN')}">
+                                                Admin
                                             </option>
+
+                                            <option value="ROLE_PROJECT_MANAGER"
+                                                    th:selected="${user.hasRole('ROLE_PROJECT_MANAGER')}">
+                                                Project Manager
+                                            </option>
+
+                                            <option value="ROLE_DEVELOPER"
+                                                    th:selected="${user.hasRole('ROLE_DEVELOPER')}">
+                                                Developer
+                                            </option>
+
                                         </select>
+
                                         <button type="submit"
-                                                class="btn btn-sm btn-outline-primary"
+                                                class="btn btn-sm
+                                                           btn-outline-primary"
                                                 title="Change Role">
                                             <i class="bi bi-person-badge"></i>
                                         </button>
+
                                     </form>
 
-                                    <!-- Toggle Enabled / Disabled -->
                                     <!--
-                                        We pass the OPPOSITE of current state
-                                        so the button toggles the status.
-                                        th:value="${!user.enabled}" sends true
-                                        if the user is currently disabled
-                                        (to enable them) and vice versa.
+                                        TOGGLE ENABLE/DISABLE FORM.
+                                        Separate form from role change.
+                                        Sends the OPPOSITE of current state
+                                        so clicking always toggles.
                                     -->
                                     <form th:action="@{/admin/users/{id}/toggle(id=${user.id})}"
                                           method="post">
+
+                                        <!--
+                                            Hidden field sends true if user
+                                            is currently disabled (to enable),
+                                            or false if currently enabled
+                                            (to disable).
+                                        -->
                                         <input type="hidden"
                                                name="enabled"
                                                th:value="${!user.enabled}">
+
+                                        <!--
+                                            Button appearance changes based
+                                            on current enabled state:
+                                            - Active user   → yellow warning button (deactivate)
+                                            - Disabled user → green success button (activate)
+                                        -->
                                         <button type="submit"
                                                 class="btn btn-sm"
                                                 th:classappend="${user.enabled}
-                                                                    ? 'btn-outline-warning'
-                                                                    : 'btn-outline-success'"
+                                                        ? 'btn-outline-warning'
+                                                        : 'btn-outline-success'"
                                                 th:title="${user.enabled}
-                                                               ? 'Deactivate account'
-                                                               : 'Activate account'">
+                                                        ? 'Deactivate this account'
+                                                        : 'Activate this account'"
+                                                th:onclick="${user.enabled}
+                                                        ? 'return confirm(\'Deactivate this user?\')'
+                                                        : 'return confirm(\'Activate this user?\')'">
                                             <i class="bi"
                                                th:classappend="${user.enabled}
-                                                                   ? 'bi-person-dash'
-                                                                   : 'bi-person-check'">
+                                                       ? 'bi-person-dash'
+                                                       : 'bi-person-check'">
                                             </i>
                                         </button>
+
                                     </form>
 
                                 </div>
                             </td>
 
                         </tr>
+
+                        <!-- Empty state -->
+                        <tr th:if="${#lists.isEmpty(users)}">
+                            <td colspan="8"
+                                class="text-center text-muted py-5">
+                                <i class="bi bi-people
+                                              fs-2 d-block mb-2"></i>
+                                No users found.
+                            </td>
+                        </tr>
+
                         </tbody>
                     </table>
                 </div>
