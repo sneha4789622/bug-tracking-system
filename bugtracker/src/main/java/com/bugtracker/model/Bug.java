@@ -171,4 +171,9 @@ public class Bug {
     public String toString() {
         return "Bug{id=" + id + ", title='" + title + "', status=" + status + "}";
     }
+    @OneToMany(mappedBy = "bug",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
+    private List<Attachment> attachments = new ArrayList<>();
 }

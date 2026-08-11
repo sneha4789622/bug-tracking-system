@@ -1,5 +1,11 @@
 package com.bugtracker.service;
-
+// Add these imports at the top of BugService.java
+import com.bugtracker.repository.BugSpecification;
+import com.bugtracker.dto.PageRequestDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import com.bugtracker.dto.BugDTO;
 import com.bugtracker.dto.BugFilterDTO;
 import com.bugtracker.exception.ResourceNotFoundException;
@@ -9,7 +15,8 @@ import com.bugtracker.util.SecurityUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.bugtracker.model.BugHistory;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,23 +33,36 @@ import java.util.stream.Collectors;
  */
 @Service
 public class BugService {
+    /**
+     * Logger for this class.
+     * SLF4J is the API; Logback is the implementation Spring Boot wires in.
+     * The class reference (BugService.class) appears in log output:
+     *   2024-01-15 10:23:41 INFO  c.b.service.BugService - Bug #5 created
+     */
+    private static final Logger log =
+            LoggerFactory.getLogger(BugService.class);
+
 
     private final BugRepository        bugRepository;
     private final ProjectRepository    projectRepository;
     private final UserRepository       userRepository;
     private final BugHistoryRepository bugHistoryRepository;
     private final CommentRepository    commentRepository;
+    private final EmailService          emailService;
 
+    // Updated constructor:
     public BugService(BugRepository        bugRepository,
                       ProjectRepository    projectRepository,
                       UserRepository       userRepository,
                       BugHistoryRepository bugHistoryRepository,
-                      CommentRepository    commentRepository) {
+                      CommentRepository    commentRepository,
+                      EmailService         emailService) {
         this.bugRepository        = bugRepository;
         this.projectRepository    = projectRepository;
         this.userRepository       = userRepository;
         this.bugHistoryRepository = bugHistoryRepository;
         this.commentRepository    = commentRepository;
+        this.emailService         = emailService;
     }
 
     // =========================================================
@@ -61,65 +81,40 @@ public class BugService {
                 .collect(Collectors.toList());
     }
 
+
+
+
     /**
-     * Applies filters from BugFilterDTO and returns matching bugs.
+     * Returns a paginated, sorted, filtered page of bugs.
      *
-     * We load all bugs and filter in memory for now.
-     * In Phase 7 (Advanced Features) we replace this with
-     * JPA Specifications for true database-level filtering.
+     * This single method replaces both getAllBugs() and
+     * getFilteredBugs() for the list page. It always paginates
+     * and filters at the database level.
+     *
+     * @param filter      filter criteria (may have all-null fields)
+     * @param pageRequest pagination and sorting parameters
+     * @return a Page<BugDTO> containing results and navigation metadata
      */
     @Transactional(readOnly = true)
-    public List<BugDTO> getFilteredBugs(BugFilterDTO filter) {
+    public Page<BugDTO> getPagedBugs(BugFilterDTO filter,
+                                     PageRequestDTO pageRequest) {
 
-        // Start with all bugs
-        List<Bug> bugs = bugRepository.findAll();
+        // Build the Pageable object: page number, size, sort
+        Pageable pageable = PageRequest.of(
+                pageRequest.getZeroBasedPage(),
+                pageRequest.getSafeSize(),
+                Sort.by(pageRequest.getSortDirection(),
+                        pageRequest.getSafeSortBy())
+        );
 
-        // Apply each filter only if it is not null
-        if (filter.getStatus() != null) {
-            bugs = bugs.stream()
-                    .filter(b -> b.getStatus() == filter.getStatus())
-                    .collect(Collectors.toList());
-        }
+        // Build the Specification from filter criteria
+        BugSpecification spec = BugSpecification.from(filter);
 
-        if (filter.getPriority() != null) {
-            bugs = bugs.stream()
-                    .filter(b -> b.getPriority() == filter.getPriority())
-                    .collect(Collectors.toList());
-        }
+        // Execute: one database query with WHERE + ORDER BY + LIMIT
+        Page<Bug> bugPage = bugRepository.findAll(spec, pageable);
 
-        if (filter.getSeverity() != null) {
-            bugs = bugs.stream()
-                    .filter(b -> b.getSeverity() == filter.getSeverity())
-                    .collect(Collectors.toList());
-        }
-
-        if (filter.getProjectId() != null) {
-            bugs = bugs.stream()
-                    .filter(b -> b.getProject().getId()
-                            .equals(filter.getProjectId()))
-                    .collect(Collectors.toList());
-        }
-
-        if (filter.getAssigneeId() != null) {
-            bugs = bugs.stream()
-                    .filter(b -> b.getAssignee() != null
-                            && b.getAssignee().getId()
-                            .equals(filter.getAssigneeId()))
-                    .collect(Collectors.toList());
-        }
-
-        if (filter.getKeyword() != null && !filter.getKeyword().isBlank()) {
-            String keyword = filter.getKeyword().toLowerCase();
-            bugs = bugs.stream()
-                    .filter(b ->
-                            b.getTitle().toLowerCase().contains(keyword)
-                                    || b.getDescription().toLowerCase().contains(keyword))
-                    .collect(Collectors.toList());
-        }
-
-        return bugs.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        // Convert each Bug entity to BugDTO, preserving page metadata
+        return bugPage.map(this::convertToDTO);
     }
 
     /**
@@ -155,7 +150,9 @@ public class BugService {
     public List<BugHistory> getBugHistory(Long bugId) {
         Bug bug = findBugOrThrow(bugId);
         return bugHistoryRepository.findByBugOrderByChangedAtDesc(bug);
+
     }
+
     // =========================================================
     // CREATE
     // =========================================================
@@ -170,6 +167,8 @@ public class BugService {
      *   4. Assignee is optional on creation
      *   5. Record creation in BugHistory
      */
+    // ... add log statements to key methods ...
+
     @Transactional
     public BugDTO createBug(BugDTO dto) {
 
@@ -205,6 +204,7 @@ public class BugService {
         recordHistory(saved, reporter, "status",
                 null, BugStatus.NEW.name());
 
+        log.info("Bug #{} created successfully", saved.getId());
         return convertToDTO(saved);
     }
 
@@ -276,22 +276,26 @@ public class BugService {
     @Transactional
     public BugDTO updateStatus(Long bugId, BugStatus newStatus) {
 
-        Bug bug         = findBugOrThrow(bugId);
+        Bug bug          = findBugOrThrow(bugId);
+        log.info("Bug #{} status change: {} → {} by '{}'",
+                bugId,
+                bug.getStatus(),
+                newStatus,
+                SecurityUtils.getCurrentUsername());
         User currentUser = SecurityUtils.getCurrentUser();
         BugStatus oldStatus = bug.getStatus();
 
-        // Validate the transition
         validateStatusTransition(oldStatus, newStatus);
-
         bug.setStatus(newStatus);
-
-        // Record the status change in history
         recordHistory(bug, currentUser,
                 "status", oldStatus.name(), newStatus.name());
 
+        // Notify reporter of status change (async, non-blocking)
+        emailService.sendStatusChangeNotification(
+                bug, oldStatus.getDisplayName(), newStatus.getDisplayName());
+
         return convertToDTO(bug);
     }
-
     /**
      * Validates that the requested status transition is permitted.
      *
@@ -338,15 +342,17 @@ public class BugService {
      */
     @Transactional
     public BugDTO assignBug(Long bugId, Long assigneeId) {
+        log.info("Bug #{} assigned to user ID {} by '{}'",
+                bugId,
+                assigneeId,
+                SecurityUtils.getCurrentUsername());
 
-        Bug bug         = findBugOrThrow(bugId);
+        Bug bug          = findBugOrThrow(bugId);
         User currentUser = SecurityUtils.getCurrentUser();
-
         String oldAssigneeName = bug.getAssignee() != null
                 ? bug.getAssignee().getUsername() : "Unassigned";
 
         if (assigneeId == null) {
-            // Unassign
             bug.setAssignee(null);
             recordHistory(bug, currentUser,
                     "assignee", oldAssigneeName, "Unassigned");
@@ -357,9 +363,12 @@ public class BugService {
             bug.setAssignee(newAssignee);
             recordHistory(bug, currentUser,
                     "assignee", oldAssigneeName, newAssignee.getUsername());
+
+            // Send async email notification to new assignee
+            emailService.sendBugAssignedNotification(bug, newAssignee);
         }
 
-        return convertToDTO(bug);
+        return convertToDTO(findBugOrThrow(bugId));
     }
 
     // =========================================================
@@ -372,6 +381,9 @@ public class BugService {
      */
     @Transactional
     public void deleteBug(Long id) {
+        log.warn("Bug #{} being deleted by '{}'",
+                id,
+                SecurityUtils.getCurrentUsername());
         if (!bugRepository.existsById(id)) {
             throw new ResourceNotFoundException(
                     "Bug not found with ID: " + id);

@@ -269,6 +269,91 @@
 
                         </div>
                     </div>
+                    <!-- ─── Attachments ─── -->
+                    <div class="card" id="attachments">
+                        <div class="card-header bg-white fw-bold">
+                            <i class="bi bi-paperclip me-2"></i>Attachments
+                            <span class="badge bg-secondary ms-1"
+                                  th:text="${#lists.size(attachments)}">0</span>
+                        </div>
+                        <div class="card-body">
+
+                            <!-- Existing attachments list -->
+                            <div th:if="${!#lists.isEmpty(attachments)}"
+                                 class="mb-3">
+                                <div th:each="att : ${attachments}"
+                                     class="d-flex justify-content-between
+                        align-items-center py-2 border-bottom">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bi bi-file-earmark text-muted"></i>
+                                        <div>
+                                            <div class="small fw-semibold"
+                                                 th:text="${att.originalFilename}">
+                                            </div>
+                                            <div class="text-muted"
+                                                 style="font-size:0.75rem"
+                                                 th:text="${att.formattedSize}
+                                       + ' · '
+                                       + ${att.uploadedBy != null
+                                          ? att.uploadedBy.fullName
+                                          : 'Unknown'}
+                                       + ' · '
+                                       + ${#temporals.format(
+                                          att.uploadedAt,
+                                          'MMM d, yyyy')}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <a th:href="@{/bugs/{bugId}/attachments/{attId}/download(
+                                  bugId=${bug.id},
+                                  attId=${att.id})}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                        <form th:action="@{/bugs/{bugId}/attachments/{attId}/delete(
+                                       bugId=${bug.id},
+                                       attId=${att.id})}"
+                                              method="post">
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm(
+                                    'Delete this attachment?')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Upload form -->
+                            <div>
+                                <p class="text-muted small mb-2">
+                                    Allowed: images, PDF, text files, ZIP. Max 10 MB.
+                                </p>
+                                <!--
+                                    enctype="multipart/form-data" is required for
+                                    file uploads. Without it, the browser sends only
+                                    the filename, not the file contents.
+                                -->
+                                <form th:action="@{/bugs/{id}/attachments(id=${bug.id})}"
+                                      method="post"
+                                      enctype="multipart/form-data"
+                                      class="d-flex gap-2">
+                                    <input type="file"
+                                           name="file"
+                                           class="form-control form-control-sm"
+                                           accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.zip">
+                                    <button type="submit"
+                                            class="btn btn-outline-secondary btn-sm
+                               text-nowrap">
+                                        <i class="bi bi-upload me-1"></i>Upload
+                                    </button>
+                                </form>
+                            </div>
+
+                        </div>
+                    </div>
 
                 </div>
 

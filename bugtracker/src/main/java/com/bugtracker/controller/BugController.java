@@ -1,5 +1,7 @@
 package com.bugtracker.controller;
-
+// Add these imports
+import com.bugtracker.dto.PageRequestDTO;
+import org.springframework.data.domain.Page;
 import com.bugtracker.dto.BugDTO;
 import com.bugtracker.dto.BugFilterDTO;
 import com.bugtracker.dto.CommentDTO;
@@ -15,6 +17,13 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import com.bugtracker.service.AttachmentService;
+import com.bugtracker.model.Attachment;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -35,16 +44,22 @@ public class BugController {
     private final CommentService commentService;
     private final ProjectService projectService;
     private final UserService    userService;
+    private final AttachmentService attachmentService;
+
 
     public BugController(BugService     bugService,
                          CommentService commentService,
                          ProjectService projectService,
-                         UserService    userService) {
+                         UserService    userService,
+                         AttachmentService attachmentService) {
         this.bugService     = bugService;
         this.commentService = commentService;
         this.projectService = projectService;
         this.userService    = userService;
+        this.attachmentService = attachmentService;
+
     }
+
 
     // =========================================================
     // LIST BUGS WITH FILTERS
@@ -59,26 +74,42 @@ public class BugController {
      * to this object automatically.
      * e.g. /bugs?status=NEW binds to filter.status = BugStatus.NEW
      */
+
+
     @GetMapping
     public String listBugs(
             @ModelAttribute BugFilterDTO filter,
+            @ModelAttribute PageRequestDTO pageRequest,
             @AuthenticationPrincipal User currentUser,
             Model model) {
 
-        List<BugDTO> bugs = filter.hasActiveFilters()
-                ? bugService.getFilteredBugs(filter)
-                : bugService.getAllBugs();
+        // Single database call — filtered, sorted, paginated
+        Page<BugDTO> bugPage = bugService.getPagedBugs(filter, pageRequest);
 
-        model.addAttribute("bugs",       bugs);
-        model.addAttribute("filter",     filter);
-        model.addAttribute("pageTitle",  "All Bugs");
+        model.addAttribute("bugPage",      bugPage);
+        model.addAttribute("bugs",         bugPage.getContent());
+        model.addAttribute("filter",       filter);
+        model.addAttribute("pageRequest",  pageRequest);
+        model.addAttribute("pageTitle",    "All Bugs");
 
-        // Populate filter dropdowns
-        model.addAttribute("allProjects",  projectService.getAllProjects());
-        model.addAttribute("allStatuses",  BugStatus.values());
-        model.addAttribute("allPriorities",BugPriority.values());
-        model.addAttribute("allSeverities",BugSeverity.values());
-        model.addAttribute("allDevelopers",userService.getAllDevelopers());
+        // Total pages for pagination controls
+        model.addAttribute("totalPages",   bugPage.getTotalPages());
+        model.addAttribute("currentPage",  pageRequest.getPage());
+        model.addAttribute("totalItems",   bugPage.getTotalElements());
+        // Page number range for buttons (max 5 buttons shown)
+        int pageStart = Math.max(1, pageRequest.getPage() - 2);
+        int pageEnd   = Math.min(bugPage.getTotalPages(),
+                pageRequest.getPage() + 2);
+
+        model.addAttribute("pageStart", pageStart);
+        model.addAttribute("pageEnd",   pageEnd);
+
+        // Filter dropdowns
+        model.addAttribute("allProjects",   projectService.getAllProjects());
+        model.addAttribute("allStatuses",   BugStatus.values());
+        model.addAttribute("allPriorities", BugPriority.values());
+        model.addAttribute("allSeverities", BugSeverity.values());
+        model.addAttribute("allDevelopers", userService.getAllDevelopers());
 
         return "bugs/list";
     }
@@ -169,6 +200,7 @@ public class BugController {
 
         // Add history for the audit trail panel
         model.addAttribute("history",     bugService.getBugHistory(id));
+        model.addAttribute("attachments", attachmentService.getAttachmentsForBug(id));
 
         return "bugs/detail";
     }
@@ -341,5 +373,80 @@ public class BugController {
         }
 
         return "redirect:/bugs/" + bugId + "#comments";
+    }
+    // ─── UPLOAD ATTACHMENT ────────────────────────────────────────
+// POST /bugs/{id}/attachments
+
+    @PostMapping("/{id}/attachments")
+    public String uploadAttachment(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            RedirectAttributes redirectAttributes) {
+
+        try {
+            attachmentService.uploadAttachment(id, file);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "File '" + file.getOriginalFilename()
+                            + "' uploaded successfully.");
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    e.getMessage());
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Upload failed: " + e.getMessage());
+        }
+
+        return "redirect:/bugs/" + id + "#attachments";
+    }
+
+// ─── DOWNLOAD ATTACHMENT ──────────────────────────────────────
+// GET /bugs/{bugId}/attachments/{attachmentId}/download
+
+    @GetMapping("/{bugId}/attachments/{attachmentId}/download")
+    public ResponseEntity<Resource> downloadAttachment(
+            @PathVariable Long bugId,
+            @PathVariable Long attachmentId) {
+
+        try {
+            Attachment attachment =
+                    attachmentService.getAttachment(attachmentId);
+            Resource resource =
+                    attachmentService.loadAttachment(attachmentId);
+
+            return ResponseEntity.ok()
+                    // Content-Disposition: attachment prompts browser to
+                    // download rather than display inline
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\""
+                                    + attachment.getOriginalFilename() + "\"")
+                    .contentType(MediaType.parseMediaType(
+                            attachment.getContentType()))
+                    .contentLength(attachment.getFileSize())
+                    .body(resource);
+
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+// ─── DELETE ATTACHMENT ────────────────────────────────────────
+// POST /bugs/{bugId}/attachments/{attachmentId}/delete
+
+    @PostMapping("/{bugId}/attachments/{attachmentId}/delete")
+    public String deleteAttachment(
+            @PathVariable Long bugId,
+            @PathVariable Long attachmentId,
+            RedirectAttributes redirectAttributes) {
+
+        try {
+            attachmentService.deleteAttachment(attachmentId);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "Attachment deleted.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Delete failed: " + e.getMessage());
+        }
+
+        return "redirect:/bugs/" + bugId + "#attachments";
     }
 }
