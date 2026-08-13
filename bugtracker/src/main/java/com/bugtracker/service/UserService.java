@@ -32,14 +32,14 @@ import java.util.List;
 @Service
 public class UserService implements UserDetailsService {
 
-    private final UserRepository    userRepository;
-    private final RoleRepository    roleRepository;
-    private final PasswordEncoder   passwordEncoder;
+    private final UserRepository  userRepository;
+    private final RoleRepository  roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
     /**
-     * Constructor injection.
-     * PasswordEncoder is a bean defined in SecurityConfig.
-     * Spring automatically injects it here.
+     * Constructor injection — parameter order must match field order.
+     * Spring matches by TYPE, not by name, so if two parameters
+     * have compatible types Spring may inject the wrong one.
      */
     public UserService(UserRepository userRepository,
                        RoleRepository roleRepository,
