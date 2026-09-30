@@ -1,0 +1,54 @@
+# ============================================================
+# render.yaml — Render deployment configuration
+# Render reads this file to know how to build and run the app
+# ============================================================
+
+services:
+
+  # ── Web Service: Spring Boot Application ─────────────────────
+  - type: web
+    name: bugtracker
+    runtime: docker
+
+    # Render builds from the Dockerfile in the repo root
+    dockerfilePath: ./Dockerfile
+
+    # Branch to deploy from
+    branch: main
+
+    # Auto-deploy when you push to main branch
+    autoDeploy: true
+
+    # Health check path — Render pings this to verify app is up
+    healthCheckPath: /actuator/health
+
+    # Environment variables set on the Render server
+    # Values marked sync: false must be set manually in Render dashboard
+    # (so they are not stored in this file — security best practice)
+    envVars:
+
+      # Spring profile — activates application-prod.properties
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
+      # Database — set these manually in Render dashboard
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+
+      # Mail — optional, set if you want email notifications
+      - key: MAIL_ENABLED
+        value: "false"
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+
+      # Java options
+      - key: JAVA_OPTS
+        value: "-Xms256m -Xmx512m"

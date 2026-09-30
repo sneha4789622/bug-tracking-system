@@ -116,6 +116,14 @@
 			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Add inside <dependencies> -->
+
+		<!-- Spring Actuator: provides /actuator/health endpoint -->
+		<!-- Render uses this to check if the app is alive -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
 
 	</dependencies>
 

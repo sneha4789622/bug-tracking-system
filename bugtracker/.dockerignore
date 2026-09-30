@@ -1,0 +1,29 @@
+# ── Build artifacts ───────────────────────────────────────────
+target/
+*.jar
+
+# ── IDE files ─────────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# ── Git ───────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Local config (never in Docker image) ─────────────────────
+application-dev.properties
+application-local.properties
+
+# ── Upload directory ─────────────────────────────────────────
+uploads/
+uploads-test/
+
+# ── Logs ─────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── OS files ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
